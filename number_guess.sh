@@ -13,31 +13,25 @@ SECRET_NUMBER=$(( RANDOM % 1000 + 1 ))
 echo "Enter your username:"
 read USERNAME
 
-# Limitar el nombre de usuario a 22 caracteres si es más largo
-if [[ ${#USERNAME} -gt 22 ]]; then
-  USERNAME="${USERNAME:0:22}"
-fi
+# Limpiar el input del usuario (eliminar espacios y caracteres especiales)
+USERNAME=$(echo "$USERNAME" | xargs)
 
 # Verificar si usuario existe
-USER_ID=$($PSQL "SELECT user_id FROM users WHERE username='$USERNAME'")
+USER_RESULT=$($PSQL "SELECT user_id FROM users WHERE username='$USERNAME'")
 
-if [[ -z $USER_ID ]]
+if [[ -z $USER_RESULT ]]
 then
+  # Usuario nuevo
   echo "Welcome, $USERNAME! It looks like this is your first time here."
-  # Insertar usuario y obtener ID - FORMA MÁS ROBUSTA
-  INSERT_RESULT=$($PSQL "INSERT INTO users(username) VALUES('$USERNAME') RETURNING user_id")
-  # Extraer el user_id de forma más confiable
-  USER_ID=$(echo "$INSERT_RESULT" | grep -oE '^[0-9]+')
-  
-  # Verificar que USER_ID no esté vacío
-  if [[ -z $USER_ID ]]; then
-    # Si falla, obtener el user_id recién insertado
-    USER_ID=$($PSQL "SELECT user_id FROM users WHERE username='$USERNAME'")
-  fi
+  # Insertar usuario y obtener ID - extraer solo el número
+  INSERT_OUTPUT=$($PSQL "INSERT INTO users(username) VALUES('$USERNAME') RETURNING user_id")
+  USER_ID=$(echo "$INSERT_OUTPUT" | grep -o '[0-9]\+' | head -1)
 else
-  # Obtener estadísticas para usuario existente
+  # Usuario existente
+  USER_ID=$USER_RESULT
+  # Obtener estadísticas
   GAMES_PLAYED=$($PSQL "SELECT COUNT(*) FROM games WHERE user_id=$USER_ID")
-  BEST_GAME=$($PSQL "SELECT COALESCE(MIN(guesses), 0) FROM games WHERE user_id=$USER_ID")
+  BEST_GAME=$($PSQL "SELECT MIN(guesses) FROM games WHERE user_id=$USER_ID")
   echo "Welcome back, $USERNAME! You have played $GAMES_PLAYED games, and your best game took $BEST_GAME guesses."
 fi
 
@@ -48,13 +42,12 @@ while true
 do
   read GUESS
   
-  # Validar que no esté vacío
+  # Ignorar entradas vacías
   if [[ -z "$GUESS" ]]; then
-    echo "Please enter a number, guess again:"
     continue
   fi
   
-  # Validar que sea un número
+  # Validar que sea un número entero
   if [[ ! "$GUESS" =~ ^[0-9]+$ ]]; then
     echo "That is not an integer, guess again:"
     continue
@@ -64,12 +57,8 @@ do
   
   if [[ $GUESS -eq $SECRET_NUMBER ]]; then
     echo "You guessed it in $GUESS_COUNT tries. The secret number was $SECRET_NUMBER. Nice job!"
-    # Verificar que USER_ID tenga un valor antes de insertar
-    if [[ -n $USER_ID && $USER_ID =~ ^[0-9]+$ ]]; then
-      $PSQL "INSERT INTO games(user_id, guesses, secret_number) VALUES($USER_ID, $GUESS_COUNT, $SECRET_NUMBER)" > /dev/null
-    else
-      echo "Error: Could not save game to database." >&2
-    fi
+    # Guardar el juego en la base de datos
+    $PSQL "INSERT INTO games(user_id, guesses, secret_number) VALUES($USER_ID, $GUESS_COUNT, $SECRET_NUMBER)" > /dev/null
     break
   elif [[ $GUESS -lt $SECRET_NUMBER ]]; then
     echo "It's higher than that, guess again:"

@@ -1,0 +1,19 @@
+Enter your username:
+Welcome, DebugTest! It looks like this is your first time here.
+[DEBUG NEW USER] USER_ID='10'
+Guess the secret number between 1 and 1000:
+It's higher than that, guess again:
+It's higher than that, guess again:
+It's higher than that, guess again:
+It's lower than that, guess again:
+It's higher than that, guess again:
+It's higher than that, guess again:
+It's higher than that, guess again:
+It's lower than that, guess again:
+It's higher than that, guess again:
+You guessed it in 10 tries. The secret number was 566. Nice job!
+[DEBUG BEFORE INSERT] USER_ID='10' GUESS_COUNT='10' SECRET='566'
+[DEBUG INSERT RESULT] 'ERROR:  column "secret_number" of relation "games" does not exist
+LINE 1: INSERT INTO games(user_id, guesses, secret_number) VALUES(10...
+                                            ^'
+[DEBUG AFTER INSERT] Games count for user: 0
