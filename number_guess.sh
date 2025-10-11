@@ -13,18 +13,22 @@ SECRET_NUMBER=$(( RANDOM % 1000 + 1 ))
 echo "Enter your username:"
 read USERNAME
 
-# Verificar si usuario existe
-USER_ID=$($PSQL "SELECT user_id FROM users WHERE username='$USERNAME'")
+# Verificar si usuario existe - OBTENER AMBOS CAMPOS
+USER_INFO=$($PSQL "SELECT user_id, username FROM users WHERE username='$USERNAME'")
 
-if [[ -z $USER_ID ]]
+if [[ -z $USER_INFO ]]
 then
   echo "Welcome, $USERNAME! It looks like this is your first time here."
-  INSERT_RESULT=$($PSQL "INSERT INTO users(username) VALUES('$USERNAME') RETURNING user_id")
-  USER_ID=$INSERT_RESULT
+  $PSQL "INSERT INTO users(username) VALUES('$USERNAME')" > /dev/null 2>&1
+  USER_ID=$($PSQL "SELECT user_id FROM users WHERE username='$USERNAME'")
 else
+  # CORRECCIÓN: Separar correctamente user_id y username
+  IFS='|' read -r USER_ID DB_USERNAME <<< "$USER_INFO"
+  
+  # Usar el username de la base de datos, no el input
   GAMES_PLAYED=$($PSQL "SELECT COUNT(*) FROM games WHERE user_id=$USER_ID")
-  BEST_GAME=$($PSQL "SELECT COALESCE(MIN(guesses), 0) FROM games WHERE user_id=$USER_ID")
-  echo "Welcome back, $USERNAME! You have played $GAMES_PLAYED games, and your best game took $BEST_GAME guesses."
+  BEST_GAME=$($PSQL "SELECT MIN(guesses) FROM games WHERE user_id=$USER_ID")
+  echo "Welcome back, $DB_USERNAME! You have played $GAMES_PLAYED games, and your best game took $BEST_GAME guesses."
 fi
 
 echo "Guess the secret number between 1 and 1000:"
@@ -34,12 +38,10 @@ while true
 do
   read GUESS
   
-  # Saltar líneas vacías sin mostrar mensaje
   if [[ -z "$GUESS" ]]; then
     continue
   fi
   
-  # Verificar si es número
   if [[ ! "$GUESS" =~ ^[0-9]+$ ]]; then
     echo "That is not an integer, guess again:"
     continue
