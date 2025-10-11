@@ -23,14 +23,8 @@ then
   USER_ID=$INSERT_RESULT
 else
   GAMES_PLAYED=$($PSQL "SELECT COUNT(*) FROM games WHERE user_id=$USER_ID")
-  
-  if [[ $GAMES_PLAYED -eq 0 ]]
-  then
-    echo "Welcome, $USERNAME! It looks like this is your first time here."
-  else
-    BEST_GAME=$($PSQL "SELECT MIN(guesses) FROM games WHERE user_id=$USER_ID")
-    echo "Welcome back, $USERNAME! You have played $GAMES_PLAYED games, and your best game took $BEST_GAME guesses."
-  fi
+  BEST_GAME=$($PSQL "SELECT MIN(guesses) FROM games WHERE user_id=$USER_ID")
+  echo "Welcome back, $USERNAME! You have played $GAMES_PLAYED games, and your best game took $BEST_GAME guesses."
 fi
 
 echo "Guess the secret number between 1 and 1000:"
