@@ -1,67 +1,53 @@
 #!/bin/bash
 
-# Variable PSQL para consultas
 PSQL="psql --username=freecodecamp --dbname=number_guess -t --no-align -c"
 
-# Generar número secreto aleatorio entre 1 y 1000
-SECRET_NUMBER=$((RANDOM % 1000 + 1))
+# Crear tablas si no existen (silenciosamente)
+$PSQL "CREATE TABLE IF NOT EXISTS users(user_id SERIAL PRIMARY KEY, username VARCHAR(22) UNIQUE NOT NULL);" > /dev/null 2>&1
+$PSQL "CREATE TABLE IF NOT EXISTS games(game_id SERIAL PRIMARY KEY, user_id INT NOT NULL REFERENCES users(user_id), guesses INT NOT NULL, secret_number INT NOT NULL);" > /dev/null 2>&1
+
+# Generar número secreto
+SECRET_NUMBER=$(( RANDOM % 1000 + 1 ))
 
 # Solicitar nombre de usuario
 echo "Enter your username:"
 read USERNAME
 
-# Verificar si el usuario existe
-USER_INFO=$($PSQL "SELECT user_id, username FROM users WHERE username='$USERNAME'")
+# Verificar si usuario existe
+USER_ID=$($PSQL "SELECT user_id FROM users WHERE username='$USERNAME'")
 
-if [[ -z $USER_INFO ]]
+if [[ -z $USER_ID ]]
 then
-  # Usuario nuevo
   echo "Welcome, $USERNAME! It looks like this is your first time here."
-  
-  # Insertar nuevo usuario
-  INSERT_USER=$($PSQL "INSERT INTO users(username) VALUES('$USERNAME')")
-  USER_ID=$($PSQL "SELECT user_id FROM users WHERE username='$USERNAME'")
+  INSERT_RESULT=$($PSQL "INSERT INTO users(username) VALUES('$USERNAME') RETURNING user_id")
+  USER_ID=$INSERT_RESULT
 else
-  # Usuario existente
-  IFS="|" read USER_ID USERNAME <<< "$USER_INFO"
-  
-  # Obtener estadísticas
   GAMES_PLAYED=$($PSQL "SELECT COUNT(*) FROM games WHERE user_id=$USER_ID")
   BEST_GAME=$($PSQL "SELECT MIN(guesses) FROM games WHERE user_id=$USER_ID")
-  
   echo "Welcome back, $USERNAME! You have played $GAMES_PLAYED games, and your best game took $BEST_GAME guesses."
 fi
 
-# Iniciar juego
 echo "Guess the secret number between 1 and 1000:"
-NUMBER_OF_GUESSES=0
+GUESS_COUNT=0
 
-while true
+# Bucle principal del juego
+while IFS= read -r GUESS
 do
-  read GUESS
-  NUMBER_OF_GUESSES=$((NUMBER_OF_GUESSES + 1))
-  
-  # Verificar que sea un entero
-  if [[ ! $GUESS =~ ^[0-9]+$ ]]
-  then
+  # Verificar si es número
+  if [[ ! "$GUESS" =~ ^[0-9]+$ ]]; then
     echo "That is not an integer, guess again:"
     continue
   fi
+
+  ((GUESS_COUNT++))
   
-  # Comparar con el número secreto
-  if [[ $GUESS -eq $SECRET_NUMBER ]]
-  then
-    # Victoria
-    echo "You guessed it in $NUMBER_OF_GUESSES tries. The secret number was $SECRET_NUMBER. Nice job!"
-    
-    # Guardar juego en la base de datos
-    INSERT_GAME=$($PSQL "INSERT INTO games(user_id, guesses) VALUES($USER_ID, $NUMBER_OF_GUESSES)")
+  if [[ $GUESS -eq $SECRET_NUMBER ]]; then
+    echo "You guessed it in $GUESS_COUNT tries. The secret number was $SECRET_NUMBER. Nice job!"
+    $PSQL "INSERT INTO games(user_id, guesses, secret_number) VALUES($USER_ID, $GUESS_COUNT, $SECRET_NUMBER)" > /dev/null 2>&1
     break
-  elif [[ $GUESS -lt $SECRET_NUMBER ]]
-  then
+  elif [[ $GUESS -lt $SECRET_NUMBER ]]; then
     echo "It's higher than that, guess again:"
   else
     echo "It's lower than that, guess again:"
   fi
 done
-# Final commit to trigger validation
