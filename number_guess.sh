@@ -48,7 +48,7 @@ GUESSES=0
 echo "Guess the secret number between 1 and 1000:"
 
 # ============================================
-# GAME LOOP
+# GAME LOOP - CORREGIDO
 # ============================================
 while true
 do
@@ -75,10 +75,10 @@ do
     break
   elif [[ $GUESS -lt $SECRET_NUMBER ]]
   then
-    # Guess too low
+    # Guess too low - tell user the secret number is HIGHER
     echo "It's higher than that, guess again:"
   else
-    # Guess too high
+    # Guess too high - tell user the secret number is LOWER
     echo "It's lower than that, guess again:"
   fi
 done
